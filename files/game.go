@@ -6,25 +6,27 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
+var ScreenW, ScreenH int
+
 type Game struct {
 	player         *Player
 	pipes          []*PipePair
+	coins          []*Coins
 	score          int
 	pipeSpeed      float64
 	pipeSpeedTimer *Timer
 	endScreenTimer *Timer
 
-	ScreenW, ScreenH int
-
 	gameOver, startScreen bool
-	inTransition bool 
-	transitionY int 
+	inTransition          bool
+	transitionY           int
 }
 
 func NewGame() *Game {
 	return &Game{
 		player:         NewPlayer(),
 		pipes:          []*PipePair{},
+		coins:          []*Coins{},
 		score:          0,
 		pipeSpeed:      2.5,
 		pipeSpeedTimer: NewTimer(10 * time.Second),
@@ -33,13 +35,15 @@ func NewGame() *Game {
 		startScreen:    true,
 
 		inTransition: false,
-		transitionY: 0,
+		transitionY:  0,
 	}
 }
 
 func (g *Game) updatePipes(active bool) {
 	if active && (len(g.pipes) == 0 || g.pipes[len(g.pipes)-1].Top.X < 200) {
-		g.pipes = append(g.pipes, NewPipePair(g.ScreenH, g.ScreenW))
+		pipes, shift := NewPipePair(ScreenH, ScreenW)
+		g.pipes = append(g.pipes, pipes)
+		g.coins = append(g.coins, NewCoins(shift))
 	}
 }
 
@@ -66,7 +70,7 @@ func (g *Game) Update() error {
 	if g.inTransition {
 		g.transitionY += 5
 
-		if g.transitionY >= g.ScreenH {
+		if g.transitionY >= ScreenH {
 			g.inTransition = false
 			g.endScreenTimer.Stop()
 			g.resetScreen()
@@ -95,6 +99,13 @@ func (g *Game) Update() error {
 	}
 	g.pipes = activePipes
 
+	var activeCoins []*Coins
+	for _, c := range g.coins {
+		c.Update()
+		activeCoins = append(activeCoins, c)
+	}
+	g.coins = activeCoins
+
 	for _, pair := range g.pipes {
 		if pair.active &&
 			(pair.Top.GetRect().Intersects(g.player.GetRect()) ||
@@ -110,10 +121,10 @@ func (g *Game) Update() error {
 func (g *Game) resetScreen() {
 	g.player = NewPlayer()
 	g.pipes = []*PipePair{}
-	g.score = 0 
+	g.score = 0
 	g.pipeSpeed = 2.5
-	g.gameOver = false 
-	g.startScreen = true 
+	g.gameOver = false
+	g.startScreen = true
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -133,14 +144,18 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		pair.Draw(screen)
 	}
 
+	for _, c := range g.coins {
+		c.Draw(screen)
+	}
+
 	if g.gameOver {
 		g.drawEndScreen(screen, &ebiten.DrawImageOptions{})
 	}
 }
 
 func (g *Game) Layout(outsideW, outsideH int) (int, int) {
-	g.ScreenW = outsideW
-	g.ScreenH = outsideH
+	ScreenW = outsideW
+	ScreenH = outsideH
 	return outsideW, outsideH
 }
 
@@ -148,7 +163,7 @@ func (g *Game) drawStartScreen(screen *ebiten.Image, opts *ebiten.DrawImageOptio
 	startScreenText := "assets/message.png"
 	overlay := loadAsset(startScreenText)
 
-	local := *opts 
+	local := *opts
 	local.GeoM.Translate(250, 100)
 	screen.DrawImage(overlay, &local)
 }
@@ -158,7 +173,7 @@ func (g *Game) drawEndScreen(screen *ebiten.Image, opts *ebiten.DrawImageOptions
 	overlay := loadAsset(endScreenText)
 
 	local := *opts
- 	local.GeoM.Translate(float64(g.ScreenW)/2-80, float64(g.ScreenH)/2)
+	local.GeoM.Translate(float64(ScreenW)/2-80, float64(ScreenH)/2)
 	screen.DrawImage(overlay, &local)
 }
 
@@ -168,7 +183,7 @@ func (g *Game) drawTransition(screen *ebiten.Image) {
 	g.drawEndScreen(screen, opts)
 
 	opts = &ebiten.DrawImageOptions{}
-	opts.GeoM.Translate(0, float64(g.ScreenH) - float64(g.transitionY)) 
+	opts.GeoM.Translate(0, float64(ScreenH)-float64(g.transitionY))
 	g.drawStartScreen(screen, opts)
 }
 

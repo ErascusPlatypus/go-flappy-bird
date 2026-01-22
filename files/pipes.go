@@ -22,7 +22,7 @@ type PipePair struct {
 	active bool 
 }
 
-func NewPipePair(SCREEN_H, SCREEN_W int) *PipePair {
+func NewPipePair(SCREEN_H, SCREEN_W int) (*PipePair, float64){
 	frac := rand.Float64()
 	gap := float64(SCREEN_H) * frac
 	shift := gap / 2 
@@ -44,7 +44,7 @@ func NewPipePair(SCREEN_H, SCREEN_W int) *PipePair {
 		Top:    top,
 		Bottom: bottom,
 		active: true,
-	}
+	} , shift
 }
 
 func (pp *PipePair) Update(move float64) {

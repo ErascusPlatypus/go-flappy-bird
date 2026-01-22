@@ -12,6 +12,7 @@ import (
 var Assets embed.FS
 var PipeSprite *ebiten.Image
 var BackgroundImage *ebiten.Image
+var CoinSprite *ebiten.Image
 
 func Init(fs embed.FS) {
 	Assets = fs
@@ -20,6 +21,7 @@ func Init(fs embed.FS) {
 func InitFeatures() {
 	PipeSprite = loadAsset("assets/pipe-green.png")
 	BackgroundImage = loadAsset("assets/background-night.png")
+	CoinSprite = loadAsset("assets/coins_1.png")
 }
 
 func loadAsset(path string) *ebiten.Image {
