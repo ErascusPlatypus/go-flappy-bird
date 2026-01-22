@@ -107,16 +107,17 @@ func (g *Game) Update() error {
 	return nil
 }
 
-
 func (g *Game) resetScreen() {
 	g.player = NewPlayer()
 	g.pipes = []*PipePair{}
 	g.score = 0 
+	g.pipeSpeed = 2.5
 	g.gameOver = false 
 	g.startScreen = true 
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
+	drawBackground(screen)
 	if g.inTransition {
 		g.drawTransition(screen)
 		return
@@ -136,7 +137,6 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.drawEndScreen(screen, &ebiten.DrawImageOptions{})
 	}
 }
-
 
 func (g *Game) Layout(outsideW, outsideH int) (int, int) {
 	g.ScreenW = outsideW
@@ -170,4 +170,18 @@ func (g *Game) drawTransition(screen *ebiten.Image) {
 	opts = &ebiten.DrawImageOptions{}
 	opts.GeoM.Translate(0, float64(g.ScreenH) - float64(g.transitionY)) 
 	g.drawStartScreen(screen, opts)
+}
+
+func drawBackground(screen *ebiten.Image) {
+	w, h := BackgroundImage.Bounds().Dx(), BackgroundImage.Bounds().Dy()
+
+	sw, sh := screen.Bounds().Dx(), screen.Bounds().Dy()
+
+	opts := &ebiten.DrawImageOptions{}
+	opts.GeoM.Scale(
+		float64(sw)/float64(w),
+		float64(sh)/float64(h),
+	)
+
+	screen.DrawImage(BackgroundImage, opts)
 }

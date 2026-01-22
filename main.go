@@ -12,7 +12,7 @@ var assets embed.FS
 
 func main() {
 	files.Init(assets)
-	files.InitPipe()
+	files.InitFeatures()
 
 	g := files.NewGame()
 	// ebiten.SetWindowSize()
