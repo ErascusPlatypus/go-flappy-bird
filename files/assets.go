@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"embed"
 	"image"
+	"log"
 	_ "image/png"
+	"path/filepath"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -12,7 +14,7 @@ import (
 var Assets embed.FS
 var PipeSprite *ebiten.Image
 var BackgroundImage *ebiten.Image
-var CoinSprite *ebiten.Image
+var CoinSprites [] *ebiten.Image
 
 func Init(fs embed.FS) {
 	Assets = fs
@@ -21,7 +23,7 @@ func Init(fs embed.FS) {
 func InitFeatures() {
 	PipeSprite = loadAsset("assets/pipe-green.png")
 	BackgroundImage = loadAsset("assets/background-night.png")
-	CoinSprite = loadAsset("assets/coins_1.png")
+	CoinSprites = loadAssets("assets/coins_*.png")
 }
 
 func loadAsset(path string) *ebiten.Image {
@@ -36,4 +38,20 @@ func loadAsset(path string) *ebiten.Image {
 	}
 
 	return ebiten.NewImageFromImage(img)
+}
+
+func loadAssets(path string) [] *ebiten.Image {
+	files, err := filepath.Glob(path)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	var res [] *ebiten.Image 
+
+	for _, f := range files {
+		res = append(res, loadAsset(f))
+	}
+
+	return res 
 }

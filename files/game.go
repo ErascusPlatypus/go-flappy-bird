@@ -2,8 +2,11 @@ package files
 
 import (
 	"time"
+	"fmt"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/text"
+	"golang.org/x/image/font/basicfont"
 )
 
 var ScreenW, ScreenH int
@@ -101,8 +104,10 @@ func (g *Game) Update() error {
 
 	var activeCoins []*Coins
 	for _, c := range g.coins {
-		c.Update()
-		activeCoins = append(activeCoins, c)
+		c.Update(g.pipeSpeed)
+		if c.coins[4].active {
+			activeCoins = append(activeCoins, c)
+		}
 	}
 	g.coins = activeCoins
 
@@ -115,12 +120,22 @@ func (g *Game) Update() error {
 		}
 	}
 
+	for _, cc := range g.coins {
+		for _, c := range cc.coins {
+			if c.active && c.GetRect().Intersects(g.player.GetRect()) {
+				g.score++ 
+				c.active = false
+			}
+		}
+	}
+
 	return nil
 }
 
 func (g *Game) resetScreen() {
 	g.player = NewPlayer()
 	g.pipes = []*PipePair{}
+	g.coins = []*Coins{}
 	g.score = 0
 	g.pipeSpeed = 2.5
 	g.gameOver = false
@@ -129,6 +144,9 @@ func (g *Game) resetScreen() {
 
 func (g *Game) Draw(screen *ebiten.Image) {
 	drawBackground(screen)
+
+	drawScore(screen, g.score)
+
 	if g.inTransition {
 		g.drawTransition(screen)
 		return
@@ -152,6 +170,7 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		g.drawEndScreen(screen, &ebiten.DrawImageOptions{})
 	}
 }
+
 
 func (g *Game) Layout(outsideW, outsideH int) (int, int) {
 	ScreenW = outsideW
@@ -200,3 +219,32 @@ func drawBackground(screen *ebiten.Image) {
 
 	screen.DrawImage(BackgroundImage, opts)
 }
+
+func drawScore(screen *ebiten.Image, score int) {
+	scoreText := fmt.Sprintf("%d", score)
+
+	scale := 3.0
+	x, y := 20.0, 50.0
+	shadowOffset := 3.0
+
+	shadowOpts := &ebiten.DrawImageOptions{}
+	shadowOpts.GeoM.Scale(scale, scale)
+	shadowOpts.GeoM.Translate(x+shadowOffset, y+shadowOffset)
+	text.DrawWithOptions(
+		screen,
+		scoreText,
+		basicfont.Face7x13,
+		shadowOpts,
+	)
+
+	mainOpts := &ebiten.DrawImageOptions{}
+	mainOpts.GeoM.Scale(scale, scale)
+	mainOpts.GeoM.Translate(x, y)
+	text.DrawWithOptions(
+		screen,
+		scoreText,
+		basicfont.Face7x13,
+		mainOpts,
+	)
+}
+

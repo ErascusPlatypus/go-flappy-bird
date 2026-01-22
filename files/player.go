@@ -1,7 +1,6 @@
 package files
 
 import (
-	"log"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -49,7 +48,6 @@ func (p *Player) Update(active bool) error {
 
 	if ebiten.IsKeyPressed(ebiten.KeySpace) && p.jumpTimer.IsReady() {
 		p.VelY = JUMP_VEL
-		log.Printf("jump ")
 		p.jumpTimer.Reset()
 	}
 
@@ -64,7 +62,6 @@ func (p *Player) Update(active bool) error {
 		p.sprite = p.spriteDown
 	}
 
-	// log.Printf("VelY : %v \n", p.VelY)
 	return nil
 }
 

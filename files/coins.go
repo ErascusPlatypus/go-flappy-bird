@@ -8,7 +8,7 @@ import (
 type Coin struct {
 	sprite *ebiten.Image
 	X, Y   float64
-	VelX   float64
+	active bool 
 }
 
 type Coins struct {
@@ -23,8 +23,8 @@ func NewCoins(shift float64) *Coins {
 
 	const (
 		count  = 5
-		spacingX = 50
-		amplitude = 50
+		spacingX = 60
+		amplitude = 60
 	)
 
 	startX := float64(ScreenW) + 40
@@ -34,10 +34,10 @@ func NewCoins(shift float64) *Coins {
 		y := gapCenterY + amplitude*math.Sin(float64(i)*0.8)
 
 		coins.coins = append(coins.coins, &Coin{
-			sprite: CoinSprite,
-			X:      x - 125,
-			Y:      y - 50,
-			VelX:   2.5,
+			sprite: CoinSprites[0],
+			X:      x - 150,
+			Y:      y - 75,
+			active: true,
 		})
 	}
 
@@ -45,15 +45,19 @@ func NewCoins(shift float64) *Coins {
 }
 
 
-func (c *Coin) Update() error {
-	c.X -= c.VelX
+func (c *Coin) Update(speed float64) error {
+	if c.Y < -50 {
+		c.active = false 
+	}
+	
+	c.X -= speed
 
 	return nil
 }
 
-func (cc *Coins) Update() error {
+func (cc *Coins) Update(speed float64) error {
 	for _, co := range cc.coins {
-		co.Update()
+		co.Update(speed)
 	}
 
 	return nil
@@ -61,7 +65,9 @@ func (cc *Coins) Update() error {
 
 func (cc *Coins) Draw(screen *ebiten.Image) {
 	for _, c := range cc.coins {
-		c.Draw(screen)
+		if c.active {
+			c.Draw(screen)
+		} 
 	}
 }
 
@@ -73,3 +79,20 @@ func (c *Coin) Draw(screen *ebiten.Image) {
 
 	screen.DrawImage(c.sprite, opts)
 }
+
+func (c *Coin) GetRect() Rect {
+	w := float64(c.sprite.Bounds().Dx())
+	h := float64(c.sprite.Bounds().Dy())
+
+	shrink := 0.50
+	x := c.X + w*shrink/2
+	y := c.Y + h*shrink/2
+
+	return NewRect(
+		x,
+		y,
+		w*(1-shrink),
+		h*(1-shrink),
+	)
+}
+
