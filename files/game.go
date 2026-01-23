@@ -1,24 +1,27 @@
 package files
 
 import (
-	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/text"
 )
 
 var ScreenW, ScreenH int
 
 type Game struct {
-	player         *Player
-	pipes          []*PipePair
-	coins          []*Coins
-	score          int
-	highScore      int
-	pipeSpeed      float64
-	pipeSpeedTimer *Timer
-	endScreenTimer *Timer
+	player           *Player
+	pipes            []*PipePair
+	coins            []*Coins
+	magnets          []*Magnet
+	magnetActive     bool
+	score            int
+	highScore        int
+	pipeSpeed        float64
+	pipeSpeedTimer   *Timer
+	endScreenTimer   *Timer
+	magnetSpawnTimer *Timer
+	magnetActiveTimer *Timer
 
 	gameOver, startScreen bool
 	inTransition          bool
@@ -35,6 +38,9 @@ func NewGame() *Game {
 		pipeSpeed:      2.5,
 		pipeSpeedTimer: NewTimer(10 * time.Second),
 		endScreenTimer: NewTimer(3 * time.Second),
+		magnetSpawnTimer: NewTimer(8 * time.Second),
+		magnetActiveTimer: NewTimer(3 * time.Second),
+		magnetActive: false,
 		gameOver:       false,
 		startScreen:    true,
 
@@ -42,6 +48,24 @@ func NewGame() *Game {
 		transitionY:  0,
 	}
 }
+
+func (g *Game) spawnMagnet() {
+	if !g.magnetSpawnTimer.IsActive() {
+		g.magnetSpawnTimer.Start()
+		return
+	}
+
+	if !g.magnetSpawnTimer.IsReady() {
+		return
+	}
+
+	if rand.Float64() < 0.5 { 
+		g.magnets = append(g.magnets, NewMagnet())
+	}
+
+	g.magnetSpawnTimer.Reset()
+}
+
 
 func (g *Game) updatePipes(active bool) {
 	if active && (len(g.pipes) == 0 || g.pipes[len(g.pipes)-1].Top.X < 200) {
@@ -93,6 +117,7 @@ func (g *Game) Update() error {
 
 	g.player.Update(true)
 	g.updatePipes(true)
+	g.spawnMagnet()
 
 	var activePipes []*PipePair
 	for _, pair := range g.pipes {
@@ -105,12 +130,22 @@ func (g *Game) Update() error {
 
 	var activeCoins []*Coins
 	for _, c := range g.coins {
-		c.Update(g.pipeSpeed)
+		c.Update(g.pipeSpeed, g.magnetActive, g.player.X, g.player.Y)
 		if c.coins[4].active {
 			activeCoins = append(activeCoins, c)
 		}
 	}
 	g.coins = activeCoins
+
+	var activeMagnets []*Magnet
+	for _, m := range g.magnets {
+		m.Update(g.pipeSpeed)
+		if m.active {
+			activeMagnets = append(activeMagnets, m)
+		}
+	}
+
+	g.magnets = activeMagnets
 
 	for _, pair := range g.pipes {
 		if pair.active &&
@@ -131,6 +166,22 @@ func (g *Game) Update() error {
 		}
 	}
 
+	for _, m := range g.magnets {
+		if m.active && m.GetRect().Intersects(g.player.GetRect()) {
+			g.magnetActive = true 
+			if !g.magnetActiveTimer.IsActive() {
+				g.magnetActiveTimer.Start()
+			}
+
+			m.active = false 
+		}
+	}
+
+	if g.magnetActiveTimer.IsReady() {
+		g.magnetActiveTimer.Stop()
+		g.magnetActive = false
+	}
+
 	return nil
 }
 
@@ -145,32 +196,38 @@ func (g *Game) resetScreen() {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-    drawBackground(screen)
+	drawBackground(screen)
 
-    drawScore(screen, g.score, 20, 50, 0, "")
+	drawScore(screen, g.score, 20, 50, 0, "")
 
-    if g.inTransition {
-        g.drawTransition(screen)
-        return
-    }
+	if g.inTransition {
+		g.drawTransition(screen)
+		return
+	}
 
-    if g.startScreen {
-        g.drawStartScreen(screen, &ebiten.DrawImageOptions{})
-        return
-    }
+	if g.startScreen {
+		g.drawStartScreen(screen, &ebiten.DrawImageOptions{})
+		return
+	}
 
-    g.player.Draw(screen)
-    for _, pair := range g.pipes {
-        pair.Draw(screen)
-    }
+	g.player.Draw(screen)
+	for _, pair := range g.pipes {
+		pair.Draw(screen)
+	}
 
-    for _, c := range g.coins {
-        c.Draw(screen)
-    }
+	for _, c := range g.coins {
+		c.Draw(screen)
+	}
 
-    if g.gameOver {
-        g.drawEndScreen(screen, &ebiten.DrawImageOptions{}, true)  // Draw with scores
-    }
+	for _, m := range g.magnets {
+		if m.active {
+			m.Draw(screen)
+		}
+	}
+
+	if g.gameOver {
+		g.drawEndScreen(screen, &ebiten.DrawImageOptions{}, true)
+	}
 }
 
 func (g *Game) Layout(outsideW, outsideH int) (int, int) {
@@ -178,77 +235,3 @@ func (g *Game) Layout(outsideW, outsideH int) (int, int) {
 	ScreenH = outsideH
 	return outsideW, outsideH
 }
-
-func (g *Game) drawStartScreen(screen *ebiten.Image, opts *ebiten.DrawImageOptions) {
-	startScreenText := "assets/message.png"
-	overlay := loadAsset(startScreenText)
-
-	local := *opts
-	local.GeoM.Translate(250, 100)
-	screen.DrawImage(overlay, &local)
-}
-
-func (g *Game) drawEndScreen(screen *ebiten.Image, opts *ebiten.DrawImageOptions, drawScores bool) {
-    cx := float64(ScreenW) / 2
-    cy := float64(ScreenH) / 2
-
-    overlay := loadAsset("assets/gameover.png")
-
-    local := *opts
-    local.GeoM.Translate(cx-100, cy-140)
-    screen.DrawImage(overlay, &local)
-
-    if drawScores {
-        _, offsetY := opts.GeoM.Apply(0, 0)
-        drawScore(screen, g.score, cx-120, cy-10+offsetY, 0, "SCORE:")
-        drawScore(screen, g.highScore, cx-120, cy+30+offsetY, 0, "HIGH SCORE:")
-    }
-}
-
-func (g *Game) drawTransition(screen *ebiten.Image) {
-    offsetUp := -float64(g.transitionY)
-    
-    opts := &ebiten.DrawImageOptions{}
-    opts.GeoM.Translate(0, offsetUp)
-    g.drawEndScreen(screen, opts, true)  
-
-    offsetDown := float64(ScreenH) - float64(g.transitionY)
-
-    opts = &ebiten.DrawImageOptions{}
-    opts.GeoM.Translate(0, offsetDown)
-    g.drawStartScreen(screen, opts)
-}
-
-
-func drawBackground(screen *ebiten.Image) {
-	w, h := BackgroundImage.Bounds().Dx(), BackgroundImage.Bounds().Dy()
-
-	sw, sh := screen.Bounds().Dx(), screen.Bounds().Dy()
-
-	opts := &ebiten.DrawImageOptions{}
-	opts.GeoM.Scale(
-		float64(sw)/float64(w),
-		float64(sh)/float64(h),
-	)
-
-	screen.DrawImage(BackgroundImage, opts)
-}
-
-func drawScore(screen *ebiten.Image, score int, x, y, offsetY float64, prefix string) {
-	s := fmt.Sprintf("%s %d", prefix, score)
-
-	offsets := []struct{ x, y float64 }{
-		{-1, 0}, {1, 0}, {0, -1}, {0, 1},
-	}
-
-	for _, o := range offsets {
-		opts := &ebiten.DrawImageOptions{}
-		opts.GeoM.Translate(x+o.x, y+o.y+offsetY)
-		text.DrawWithOptions(screen, s, ScoreFont, opts)
-	}
-
-	opts := &ebiten.DrawImageOptions{}
-	opts.GeoM.Translate(x, y+offsetY)
-	text.DrawWithOptions(screen, s, ScoreFont, opts)
-}
-

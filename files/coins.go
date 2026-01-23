@@ -44,20 +44,34 @@ func NewCoins(shift float64) *Coins {
 	return coins
 }
 
-
-func (c *Coin) Update(speed float64) error {
+func (c *Coin) Update(speed float64, magnetActive bool, targetX, targetY float64) error {
 	if c.Y < -50 {
 		c.active = false 
 	}
 	
-	c.X -= speed
+	if magnetActive && c.active {
+		dx := targetX - c.X 
+		dy := targetY - c.Y 
+
+		dist := math.Hypot(dx, dy)
+		if dist > 0 {
+			c.X += (dx/dist) * (2 * speed) 
+			c.Y += (dy/dist) * (2 * speed)
+		}
+
+		return nil 
+	}
+
+	if !magnetActive && c.active {
+		c.X -= speed
+	}
 
 	return nil
 }
 
-func (cc *Coins) Update(speed float64) error {
+func (cc *Coins) Update(speed float64, magnetActive bool, X, Y float64) error {
 	for _, co := range cc.coins {
-		co.Update(speed)
+		co.Update(speed, magnetActive, X, Y)
 	}
 
 	return nil
