@@ -1,12 +1,11 @@
 package files
 
 import (
-	"time"
 	"fmt"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text"
-	"golang.org/x/image/font/basicfont"
 )
 
 var ScreenW, ScreenH int
@@ -16,6 +15,7 @@ type Game struct {
 	pipes          []*PipePair
 	coins          []*Coins
 	score          int
+	highScore      int
 	pipeSpeed      float64
 	pipeSpeedTimer *Timer
 	endScreenTimer *Timer
@@ -31,6 +31,7 @@ func NewGame() *Game {
 		pipes:          []*PipePair{},
 		coins:          []*Coins{},
 		score:          0,
+		highScore:      0,
 		pipeSpeed:      2.5,
 		pipeSpeedTimer: NewTimer(10 * time.Second),
 		endScreenTimer: NewTimer(3 * time.Second),
@@ -115,6 +116,7 @@ func (g *Game) Update() error {
 		if pair.active &&
 			(pair.Top.GetRect().Intersects(g.player.GetRect()) ||
 				pair.Bottom.GetRect().Intersects(g.player.GetRect())) {
+			g.highScore = max(g.score, g.highScore)
 			g.gameOver = true
 			return nil
 		}
@@ -123,7 +125,7 @@ func (g *Game) Update() error {
 	for _, cc := range g.coins {
 		for _, c := range cc.coins {
 			if c.active && c.GetRect().Intersects(g.player.GetRect()) {
-				g.score++ 
+				g.score++
 				c.active = false
 			}
 		}
@@ -143,34 +145,33 @@ func (g *Game) resetScreen() {
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
-	drawBackground(screen)
+    drawBackground(screen)
 
-	drawScore(screen, g.score)
+    drawScore(screen, g.score, 20, 50, 0, "")
 
-	if g.inTransition {
-		g.drawTransition(screen)
-		return
-	}
+    if g.inTransition {
+        g.drawTransition(screen)
+        return
+    }
 
-	if g.startScreen {
-		g.drawStartScreen(screen, &ebiten.DrawImageOptions{})
-		return
-	}
+    if g.startScreen {
+        g.drawStartScreen(screen, &ebiten.DrawImageOptions{})
+        return
+    }
 
-	g.player.Draw(screen)
-	for _, pair := range g.pipes {
-		pair.Draw(screen)
-	}
+    g.player.Draw(screen)
+    for _, pair := range g.pipes {
+        pair.Draw(screen)
+    }
 
-	for _, c := range g.coins {
-		c.Draw(screen)
-	}
+    for _, c := range g.coins {
+        c.Draw(screen)
+    }
 
-	if g.gameOver {
-		g.drawEndScreen(screen, &ebiten.DrawImageOptions{})
-	}
+    if g.gameOver {
+        g.drawEndScreen(screen, &ebiten.DrawImageOptions{}, true)  // Draw with scores
+    }
 }
-
 
 func (g *Game) Layout(outsideW, outsideH int) (int, int) {
 	ScreenW = outsideW
@@ -187,24 +188,37 @@ func (g *Game) drawStartScreen(screen *ebiten.Image, opts *ebiten.DrawImageOptio
 	screen.DrawImage(overlay, &local)
 }
 
-func (g *Game) drawEndScreen(screen *ebiten.Image, opts *ebiten.DrawImageOptions) {
-	endScreenText := "assets/gameover.png"
-	overlay := loadAsset(endScreenText)
+func (g *Game) drawEndScreen(screen *ebiten.Image, opts *ebiten.DrawImageOptions, drawScores bool) {
+    cx := float64(ScreenW) / 2
+    cy := float64(ScreenH) / 2
 
-	local := *opts
-	local.GeoM.Translate(float64(ScreenW)/2-80, float64(ScreenH)/2)
-	screen.DrawImage(overlay, &local)
+    overlay := loadAsset("assets/gameover.png")
+
+    local := *opts
+    local.GeoM.Translate(cx-100, cy-140)
+    screen.DrawImage(overlay, &local)
+
+    if drawScores {
+        _, offsetY := opts.GeoM.Apply(0, 0)
+        drawScore(screen, g.score, cx-120, cy-10+offsetY, 0, "SCORE:")
+        drawScore(screen, g.highScore, cx-120, cy+30+offsetY, 0, "HIGH SCORE:")
+    }
 }
 
 func (g *Game) drawTransition(screen *ebiten.Image) {
-	opts := &ebiten.DrawImageOptions{}
-	opts.GeoM.Translate(0, -float64(g.transitionY))
-	g.drawEndScreen(screen, opts)
+    offsetUp := -float64(g.transitionY)
+    
+    opts := &ebiten.DrawImageOptions{}
+    opts.GeoM.Translate(0, offsetUp)
+    g.drawEndScreen(screen, opts, true)  
 
-	opts = &ebiten.DrawImageOptions{}
-	opts.GeoM.Translate(0, float64(ScreenH)-float64(g.transitionY))
-	g.drawStartScreen(screen, opts)
+    offsetDown := float64(ScreenH) - float64(g.transitionY)
+
+    opts = &ebiten.DrawImageOptions{}
+    opts.GeoM.Translate(0, offsetDown)
+    g.drawStartScreen(screen, opts)
 }
+
 
 func drawBackground(screen *ebiten.Image) {
 	w, h := BackgroundImage.Bounds().Dx(), BackgroundImage.Bounds().Dy()
@@ -220,31 +234,21 @@ func drawBackground(screen *ebiten.Image) {
 	screen.DrawImage(BackgroundImage, opts)
 }
 
-func drawScore(screen *ebiten.Image, score int) {
-	scoreText := fmt.Sprintf("%d", score)
+func drawScore(screen *ebiten.Image, score int, x, y, offsetY float64, prefix string) {
+	s := fmt.Sprintf("%s %d", prefix, score)
 
-	scale := 3.0
-	x, y := 20.0, 50.0
-	shadowOffset := 3.0
+	offsets := []struct{ x, y float64 }{
+		{-1, 0}, {1, 0}, {0, -1}, {0, 1},
+	}
 
-	shadowOpts := &ebiten.DrawImageOptions{}
-	shadowOpts.GeoM.Scale(scale, scale)
-	shadowOpts.GeoM.Translate(x+shadowOffset, y+shadowOffset)
-	text.DrawWithOptions(
-		screen,
-		scoreText,
-		basicfont.Face7x13,
-		shadowOpts,
-	)
+	for _, o := range offsets {
+		opts := &ebiten.DrawImageOptions{}
+		opts.GeoM.Translate(x+o.x, y+o.y+offsetY)
+		text.DrawWithOptions(screen, s, ScoreFont, opts)
+	}
 
-	mainOpts := &ebiten.DrawImageOptions{}
-	mainOpts.GeoM.Scale(scale, scale)
-	mainOpts.GeoM.Translate(x, y)
-	text.DrawWithOptions(
-		screen,
-		scoreText,
-		basicfont.Face7x13,
-		mainOpts,
-	)
+	opts := &ebiten.DrawImageOptions{}
+	opts.GeoM.Translate(x, y+offsetY)
+	text.DrawWithOptions(screen, s, ScoreFont, opts)
 }
 

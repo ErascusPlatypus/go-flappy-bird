@@ -9,15 +9,26 @@ import (
 	"path/filepath"
 
 	"github.com/hajimehoshi/ebiten/v2"
+
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/opentype"
 )
 
 var Assets embed.FS
 var PipeSprite *ebiten.Image
 var BackgroundImage *ebiten.Image
 var CoinSprites [] *ebiten.Image
+var ScoreFont font.Face
 
 func Init(fs embed.FS) {
 	Assets = fs
+
+	fontBytes, err := Assets.ReadFile("assets/ProtestGuerrilla-Regular.ttf")
+	if err != nil {
+		panic(err)
+	}
+
+	InitFonts(fontBytes)
 }
 
 func InitFeatures() {
@@ -54,4 +65,21 @@ func loadAssets(path string) [] *ebiten.Image {
 	}
 
 	return res 
+}
+
+func InitFonts(fsData []byte) {
+	tt, err := opentype.Parse(fsData)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ScoreFont, err = opentype.NewFace(tt, &opentype.FaceOptions{
+		Size:    36,
+		DPI:     72,
+		Hinting: font.HintingFull,
+	})
+
+	if err != nil {
+		log.Fatal(err)
+	}	
 }
