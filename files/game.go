@@ -75,37 +75,39 @@ func (g *Game) updatePipes(active bool) {
 	}
 }
 
-func (g *Game) Update() error {
+func (g *Game) handleScreens() bool {
 	if g.startScreen && !g.inTransition {
 		if ebiten.IsKeyPressed(ebiten.KeySpace) {
 			g.startScreen = false
 		}
-		return nil
+		return true
 	}
 
 	if g.gameOver && !g.inTransition {
 		if !g.endScreenTimer.IsActive() {
 			g.endScreenTimer.Start()
 		}
-
 		if g.endScreenTimer.IsReady() {
 			g.inTransition = true
 			g.transitionY = 0
 		}
-		return nil
+		return true
 	}
 
 	if g.inTransition {
 		g.transitionY += 5
-
 		if g.transitionY >= ScreenH {
 			g.inTransition = false
 			g.endScreenTimer.Stop()
 			g.resetScreen()
 		}
-		return nil
+		return true
 	}
 
+	return false
+}
+
+func (g *Game) updateDifficulty() {
 	if !g.pipeSpeedTimer.IsActive() {
 		g.pipeSpeedTimer.Start()
 	}
@@ -114,49 +116,67 @@ func (g *Game) Update() error {
 		g.pipeSpeed += 1.0
 		g.pipeSpeedTimer.Reset()
 	}
+}
 
-	g.player.Update(true)
-	g.updatePipes(true)
-	g.spawnMagnet()
-
-	var activePipes []*PipePair
-	for _, pair := range g.pipes {
-		pair.Update(g.pipeSpeed)
-		if pair.active {
-			activePipes = append(activePipes, pair)
+func (g *Game) updatePipesList() {
+	var active []*PipePair
+	for _, p := range g.pipes {
+		p.Update(g.pipeSpeed)
+		if p.active {
+			active = append(active, p)
 		}
 	}
-	g.pipes = activePipes
+	g.pipes = active
+}
 
-	var activeCoins []*Coins
+func (g *Game) updateCoinsList() {
+	var active []*Coins
 	for _, c := range g.coins {
 		c.Update(g.pipeSpeed, g.magnetActive, g.player.X, g.player.Y)
 		if c.coins[4].active {
-			activeCoins = append(activeCoins, c)
+			active = append(active, c)
 		}
 	}
-	g.coins = activeCoins
+	g.coins = active
+}
 
-	var activeMagnets []*Magnet
+func (g *Game) updateMagnetsList() {
+	var active []*Magnet
 	for _, m := range g.magnets {
 		m.Update(g.pipeSpeed)
 		if m.active {
-			activeMagnets = append(activeMagnets, m)
+			active = append(active, m)
 		}
 	}
+	g.magnets = active
+}
 
-	g.magnets = activeMagnets
 
-	for _, pair := range g.pipes {
-		if pair.active &&
-			(pair.Top.GetRect().Intersects(g.player.GetRect()) ||
-				pair.Bottom.GetRect().Intersects(g.player.GetRect())) {
+func (g *Game) updateEntities() {
+	g.player.Update(true)
+
+	g.updatePipes(true)
+	g.spawnMagnet()
+
+	g.updatePipesList()
+	g.updateCoinsList()
+	g.updateMagnetsList()
+}
+
+func (g *Game) handlePipeCollision() {
+	for _, p := range g.pipes {
+		if p.active &&
+			(p.Top.GetRect().Intersects(g.player.GetRect()) ||
+				p.Bottom.GetRect().Intersects(g.player.GetRect())) {
+
 			g.highScore = max(g.score, g.highScore)
 			g.gameOver = true
-			return nil
+			return
 		}
 	}
+}
 
+func (g *Game) handleCoinCollision() {
 	for _, cc := range g.coins {
 		for _, c := range cc.coins {
 			if c.active && c.GetRect().Intersects(g.player.GetRect()) {
@@ -165,22 +185,48 @@ func (g *Game) Update() error {
 			}
 		}
 	}
+}
 
-	for _, m := range g.magnets {
-		if m.active && m.GetRect().Intersects(g.player.GetRect()) {
-			g.magnetActive = true 
-			if !g.magnetActiveTimer.IsActive() {
-				g.magnetActiveTimer.Start()
-			}
-
-			m.active = false 
-		}
+func (g *Game) activateMagnet() {
+	g.magnetActive = true
+	if !g.magnetActiveTimer.IsActive() {
+		g.magnetActiveTimer.Start()
 	}
+}
 
+func (g *Game) handleMagnetState() {
 	if g.magnetActiveTimer.IsReady() {
 		g.magnetActiveTimer.Stop()
 		g.magnetActive = false
 	}
+}
+
+func (g *Game) handleMagnetPickup() {
+	for _, m := range g.magnets {
+		if m.active && m.GetRect().Intersects(g.player.GetRect()) {
+			g.activateMagnet()
+			m.active = false
+		}
+	}
+}
+
+
+func (g *Game) handleCollisions() {
+	g.handlePipeCollision()
+	g.handleCoinCollision()
+	g.handleMagnetPickup()
+}
+
+
+func (g *Game) Update() error {
+	if g.handleScreens() {
+		return nil
+	}
+
+	g.updateDifficulty()
+	g.updateEntities()
+	g.handleCollisions()
+	g.handleMagnetState()
 
 	return nil
 }
