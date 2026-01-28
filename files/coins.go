@@ -16,7 +16,7 @@ type Coins struct {
 }
 
 func NewCoins(shift float64) *Coins {
-	h := PipeSprite.Bounds().Dy()
+	h := PipeSprites[0].Bounds().Dy()
 	gapCenterY := float64(h-int(shift)) + 100
 
 	coins := &Coins{}

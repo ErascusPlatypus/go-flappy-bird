@@ -1,6 +1,7 @@
 package files
 
 import (
+	"log"
 	"math/rand"
 	"time"
 
@@ -22,6 +23,9 @@ type Game struct {
 	endScreenTimer   *Timer
 	magnetSpawnTimer *Timer
 	magnetActiveTimer *Timer
+	abilityActiveTimer *Timer
+	abilityTimer      *Timer
+	abilityActive bool 
 
 	gameOver, startScreen bool
 	inTransition          bool
@@ -35,17 +39,25 @@ func NewGame() *Game {
 		coins:          []*Coins{},
 		score:          0,
 		highScore:      0,
+
 		pipeSpeed:      2.5,
 		pipeSpeedTimer: NewTimer(10 * time.Second),
-		endScreenTimer: NewTimer(3 * time.Second),
+		
 		magnetSpawnTimer: NewTimer(8 * time.Second),
 		magnetActiveTimer: NewTimer(3 * time.Second),
 		magnetActive: false,
+
+		abilityActiveTimer: NewTimer(3 * time.Second),
+		abilityTimer: NewTimer(2 * time.Second),
+		abilityActive: false,
+				
 		gameOver:       false,
 		startScreen:    true,
 
 		inTransition: false,
 		transitionY:  0,
+		endScreenTimer: NewTimer(3 * time.Second),
+
 	}
 }
 
@@ -66,12 +78,40 @@ func (g *Game) spawnMagnet() {
 	g.magnetSpawnTimer.Reset()
 }
 
-
 func (g *Game) updatePipes(active bool) {
 	if active && (len(g.pipes) == 0 || g.pipes[len(g.pipes)-1].Top.X < 200) {
 		pipes, shift := NewPipePair(ScreenH, ScreenW)
 		g.pipes = append(g.pipes, pipes)
 		g.coins = append(g.coins, NewCoins(shift))
+	}
+}
+
+func (g *Game) activateAbility() {
+	g.abilityActive = true
+	if !g.abilityActiveTimer.IsActive() {
+		log.Printf("Ability active set to true")
+
+		g.abilityActiveTimer.Start()
+	}
+}
+
+func (g *Game) handleAbilityState() {
+	if g.abilityActiveTimer.IsReady() {
+		log.Printf("Ability active timer stop")
+		g.abilityActiveTimer.Stop()
+		g.abilityActive = false
+	}
+}
+
+func (g *Game) handleAbility() {
+	if !g.abilityTimer.IsActive() {
+		g.abilityTimer.Start()
+	}
+
+	if !g.startScreen && g.abilityTimer.IsReady() && ebiten.IsKeyPressed(ebiten.KeyEnter) {
+		log.Printf("Enter key pressed")
+		g.activateAbility()
+		g.abilityTimer.Stop()
 	}
 }
 
@@ -120,10 +160,14 @@ func (g *Game) updateDifficulty() {
 
 func (g *Game) updatePipesList() {
 	var active []*PipePair
-	for _, p := range g.pipes {
-		p.Update(g.pipeSpeed)
-		if p.active {
-			active = append(active, p)
+	for _, pp := range g.pipes {
+		if g.abilityActive {
+			log.Printf("ability active set to true")
+		}
+
+		pp.Update(g.pipeSpeed, g.abilityActive)
+		if pp.active {
+			active = append(active, pp)
 		}
 	}
 	g.pipes = active
@@ -156,6 +200,7 @@ func (g *Game) updateEntities() {
 	g.player.Update(true)
 
 	g.updatePipes(true)
+	g.handleAbility() 
 	g.spawnMagnet()
 
 	g.updatePipesList()
@@ -227,6 +272,7 @@ func (g *Game) Update() error {
 	g.updateEntities()
 	g.handleCollisions()
 	g.handleMagnetState()
+	g.handleAbilityState()
 
 	return nil
 }
