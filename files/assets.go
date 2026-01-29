@@ -19,6 +19,7 @@ var PipeSprites [] *ebiten.Image
 var BackgroundImage *ebiten.Image
 var MagnetSprite  *ebiten.Image
 var CoinSprites [] *ebiten.Image
+var AbilitySprite *ebiten.Image
 var ScoreFont font.Face
 
 
@@ -38,6 +39,7 @@ func InitFeatures() {
 	BackgroundImage = loadAsset("assets/background-night.png")
 	CoinSprites = loadAssets("assets/coins_*.png")
 	MagnetSprite = loadAsset("assets/coin_magnet.png")
+	AbilitySprite = loadAsset("assets/ability-sprite.png")
 }
 
 func loadAsset(path string) *ebiten.Image {

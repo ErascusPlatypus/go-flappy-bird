@@ -2,7 +2,7 @@ package files
 
 import (
 	"math/rand"
-
+	"math"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -23,16 +23,41 @@ func NewMagnet() *Magnet {
 	} 
 }
  
-func (m *Magnet) Update(speed float64) error {
+func (m *Magnet) Update(speed float64, magnetActive bool) error {
+	if magnetActive {
+		targetX := 25.0
+		targetY := 425.0
+
+		dx := targetX - m.X
+		dy := targetY - m.Y
+
+		dist := math.Hypot(dx, dy)
+
+		if dist > 0 {
+			vx := (dx / dist) * speed * 2 
+			vy := (dy / dist) * speed * 2
+
+			if dist < speed {
+				m.X = targetX
+				m.Y = targetY
+			} else {
+				m.X += vx
+				m.Y += vy
+			}
+		}
+
+		return nil
+	}
+
 	if m.X < -50 {
-		m.active = false 
+		m.active = false
 	}
-	
+
 	if m.active {
-		m.X -= speed 
+		m.X -= speed
 	}
-	
-	return nil 
+
+	return nil
 }
 
 func (m *Magnet) Draw(screen *ebiten.Image,) {
@@ -45,5 +70,5 @@ func (m *Magnet) Draw(screen *ebiten.Image,) {
 
 func (m *Magnet) GetRect() Rect {
     w, h := m.sprite.Bounds().Dx(), m.sprite.Bounds().Dy()
-    return NewRect(m.X, m.Y, float64(w), float64(h))
-}   
+    return NewRect(m.X, m.Y, float64(w)*0.2, float64(h)*0.2)
+}

@@ -45,7 +45,7 @@ func NewCoins(shift float64) *Coins {
 }
 
 func (c *Coin) Update(speed float64, magnetActive bool, targetX, targetY float64) error {
-	if c.Y < -50 {
+	if c.X < -50 {
 		c.active = false 
 	}
 	
@@ -95,18 +95,18 @@ func (c *Coin) Draw(screen *ebiten.Image) {
 }
 
 func (c *Coin) GetRect() Rect {
-	w := float64(c.sprite.Bounds().Dx())
-	h := float64(c.sprite.Bounds().Dy())
+    w := float64(c.sprite.Bounds().Dx()) * 0.25
+    h := float64(c.sprite.Bounds().Dy()) * 0.25
 
-	shrink := 0.50
-	x := c.X + w*shrink/2
-	y := c.Y + h*shrink/2
+    shrink := 0.50
+    x := c.X + w*shrink/2
+    y := c.Y + h*shrink/2
 
-	return NewRect(
-		x,
-		y,
-		w*(1-shrink),
-		h*(1-shrink),
-	)
+    return NewRect(
+        x,
+        y,
+        w*(1-shrink),
+        h*(1-shrink),
+    )
 }
 

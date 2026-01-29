@@ -1,7 +1,6 @@
 package files
 
 import (
-	"log"
 	"math/rand"
 	"time"
 
@@ -60,7 +59,6 @@ func NewPipePair(SCREEN_H, SCREEN_W int) (*PipePair, float64) {
 func (pp *PipePair) Destroy() {
 	if pp.gettingDestroyed && pp.gettingDestroyedTimer.IsReady() {
 		pp.spritePos++
-		log.Printf("current spritePos : %v", pp.spritePos)
 		if pp.spritePos >= len(pp.sprites) {
 			pp.gettingDestroyed = false
 			pp.spritePos = len(pp.sprites) - 1
@@ -80,7 +78,6 @@ func (pp *PipePair) Update(move float64, abilityActive bool) {
 	}
 
 	if abilityActive {
-		log.Printf("calling destroy function in pipes.go")
 		pp.gettingDestroyed = true
 
 		if !pp.gettingDestroyedTimer.IsActive() {
@@ -91,7 +88,6 @@ func (pp *PipePair) Update(move float64, abilityActive bool) {
 	}
 
 	pp.Top.sprite = pp.sprites[pp.spritePos]
-	// log.Printf("set top/btm sprites to %v pos", pp.spritePos)
 	pp.Bottom.sprite = pp.sprites[pp.spritePos]
 }
 

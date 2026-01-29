@@ -1,7 +1,6 @@
 package files
 
 import (
-	"log"
 	"math/rand"
 	"time"
 
@@ -11,21 +10,22 @@ import (
 var ScreenW, ScreenH int
 
 type Game struct {
-	player           *Player
-	pipes            []*PipePair
-	coins            []*Coins
-	magnets          []*Magnet
-	magnetActive     bool
-	score            int
-	highScore        int
-	pipeSpeed        float64
-	pipeSpeedTimer   *Timer
-	endScreenTimer   *Timer
-	magnetSpawnTimer *Timer
-	magnetActiveTimer *Timer
+	player             *Player
+	pipes              []*PipePair
+	coins              []*Coins
+	magnets            []*Magnet
+	magnetActive       bool
+	score              int
+	highScore          int
+	pipeSpeed          float64
+	pipeSpeedTimer     *Timer
+	endScreenTimer     *Timer
+	magnetSpawnTimer   *Timer
+	magnetActiveTimer  *Timer
 	abilityActiveTimer *Timer
-	abilityTimer      *Timer
-	abilityActive bool 
+	abilityTimer       *Timer
+	abilityActive      bool
+	ability            *Ability
 
 	gameOver, startScreen bool
 	inTransition          bool
@@ -34,30 +34,30 @@ type Game struct {
 
 func NewGame() *Game {
 	return &Game{
-		player:         NewPlayer(),
-		pipes:          []*PipePair{},
-		coins:          []*Coins{},
-		score:          0,
-		highScore:      0,
+		player:    NewPlayer(),
+		ability:   NewAbility(),
+		pipes:     []*PipePair{},
+		coins:     []*Coins{},
+		score:     0,
+		highScore: 0,
 
 		pipeSpeed:      2.5,
 		pipeSpeedTimer: NewTimer(10 * time.Second),
-		
-		magnetSpawnTimer: NewTimer(8 * time.Second),
+
+		magnetSpawnTimer:  NewTimer(8 * time.Second),
 		magnetActiveTimer: NewTimer(3 * time.Second),
-		magnetActive: false,
+		magnetActive:      false,
 
-		abilityActiveTimer: NewTimer(3 * time.Second),
-		abilityTimer: NewTimer(2 * time.Second),
-		abilityActive: false,
-				
-		gameOver:       false,
-		startScreen:    true,
+		abilityActiveTimer: NewTimer(5 * time.Second),
+		abilityTimer:       NewTimer(10 * time.Second),
+		abilityActive:      false,
 
-		inTransition: false,
-		transitionY:  0,
+		gameOver:    false,
+		startScreen: true,
+
+		inTransition:   false,
+		transitionY:    0,
 		endScreenTimer: NewTimer(3 * time.Second),
-
 	}
 }
 
@@ -71,7 +71,7 @@ func (g *Game) spawnMagnet() {
 		return
 	}
 
-	if rand.Float64() < 0.5 { 
+	if rand.Float64() < 0.5 {
 		g.magnets = append(g.magnets, NewMagnet())
 	}
 
@@ -89,17 +89,15 @@ func (g *Game) updatePipes(active bool) {
 func (g *Game) activateAbility() {
 	g.abilityActive = true
 	if !g.abilityActiveTimer.IsActive() {
-		log.Printf("Ability active set to true")
-
 		g.abilityActiveTimer.Start()
 	}
 }
 
 func (g *Game) handleAbilityState() {
 	if g.abilityActiveTimer.IsReady() {
-		log.Printf("Ability active timer stop")
 		g.abilityActiveTimer.Stop()
 		g.abilityActive = false
+		g.abilityTimer.Reset()
 	}
 }
 
@@ -109,7 +107,6 @@ func (g *Game) handleAbility() {
 	}
 
 	if !g.startScreen && g.abilityTimer.IsReady() && ebiten.IsKeyPressed(ebiten.KeyEnter) {
-		log.Printf("Enter key pressed")
 		g.activateAbility()
 		g.abilityTimer.Stop()
 	}
@@ -161,10 +158,6 @@ func (g *Game) updateDifficulty() {
 func (g *Game) updatePipesList() {
 	var active []*PipePair
 	for _, pp := range g.pipes {
-		if g.abilityActive {
-			log.Printf("ability active set to true")
-		}
-
 		pp.Update(g.pipeSpeed, g.abilityActive)
 		if pp.active {
 			active = append(active, pp)
@@ -187,7 +180,7 @@ func (g *Game) updateCoinsList() {
 func (g *Game) updateMagnetsList() {
 	var active []*Magnet
 	for _, m := range g.magnets {
-		m.Update(g.pipeSpeed)
+		m.Update(g.pipeSpeed, g.magnetActiveTimer.IsActive())
 		if m.active {
 			active = append(active, m)
 		}
@@ -195,12 +188,11 @@ func (g *Game) updateMagnetsList() {
 	g.magnets = active
 }
 
-
 func (g *Game) updateEntities() {
 	g.player.Update(true)
 
 	g.updatePipes(true)
-	g.handleAbility() 
+	g.handleAbility()
 	g.spawnMagnet()
 
 	g.updatePipesList()
@@ -250,18 +242,18 @@ func (g *Game) handleMagnetPickup() {
 	for _, m := range g.magnets {
 		if m.active && m.GetRect().Intersects(g.player.GetRect()) {
 			g.activateMagnet()
-			m.active = false
+			if g.magnetActiveTimer.IsReady() {
+				m.active = false
+			}
 		}
 	}
 }
-
 
 func (g *Game) handleCollisions() {
 	g.handlePipeCollision()
 	g.handleCoinCollision()
 	g.handleMagnetPickup()
 }
-
 
 func (g *Game) Update() error {
 	if g.handleScreens() {
@@ -281,10 +273,20 @@ func (g *Game) resetScreen() {
 	g.player = NewPlayer()
 	g.pipes = []*PipePair{}
 	g.coins = []*Coins{}
+	g.magnets = []*Magnet{}
 	g.score = 0
 	g.pipeSpeed = 2.5
 	g.gameOver = false
 	g.startScreen = true
+
+	g.pipeSpeedTimer.Stop()
+	g.magnetSpawnTimer.Stop()
+	g.magnetActiveTimer.Stop()
+	g.magnetActive = false
+
+	g.abilityTimer.Stop()
+	g.abilityActiveTimer.Stop()
+	g.abilityActive = false
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -315,6 +317,10 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		if m.active {
 			m.Draw(screen)
 		}
+	}
+
+	if g.abilityTimer.IsReady() {
+		g.ability.Draw(screen)
 	}
 
 	if g.gameOver {
