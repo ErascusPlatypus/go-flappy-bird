@@ -26,6 +26,8 @@ type Game struct {
 	abilityTimer       *Timer
 	abilityActive      bool
 	ability            *Ability
+	saviours           [] *Saviour
+	saviourTimer       *Timer
 
 	gameOver, startScreen bool
 	inTransition          bool
@@ -51,6 +53,9 @@ func NewGame() *Game {
 		abilityActiveTimer: NewTimer(5 * time.Second),
 		abilityTimer:       NewTimer(10 * time.Second),
 		abilityActive:      false,
+
+		saviours:  [] *Saviour{},
+		saviourTimer: NewTimer(5 * time.Second),
 
 		gameOver:    false,
 		startScreen: true,
@@ -109,6 +114,29 @@ func (g *Game) handleAbility() {
 	if !g.startScreen && g.abilityTimer.IsReady() && ebiten.IsKeyPressed(ebiten.KeyEnter) {
 		g.activateAbility()
 		g.abilityTimer.Stop()
+	}
+}
+
+func (g *Game) spawnSaviours() {
+	x, y := 0.0, 50.0 
+	for i := 0 ; i < 5 ; i++ {
+		g.saviours = append(g.saviours, NewSaviour(x, y))
+		y += 100.0
+	}
+}
+
+func (g *Game) handleSaviours() {
+	if !g.saviourTimer.IsActive() {
+		g.saviourTimer.Start()
+	}
+
+	if !g.startScreen && g.saviourTimer.IsReady() && ebiten.IsKeyPressed(ebiten.KeyR) {
+		g.spawnSaviours() 
+		g.saviourTimer.Reset()
+	}
+
+	for _, s := range g.saviours {
+		s.Update()
 	}
 }
 
@@ -193,6 +221,7 @@ func (g *Game) updateEntities() {
 
 	g.updatePipes(true)
 	g.handleAbility()
+	g.handleSaviours()
 	g.spawnMagnet()
 
 	g.updatePipesList()
@@ -316,6 +345,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	for _, m := range g.magnets {
 		if m.active {
 			m.Draw(screen)
+		}
+	}
+
+	for _, s := range g.saviours {
+		if s.active {
+			s.Draw(screen)
 		}
 	}
 
