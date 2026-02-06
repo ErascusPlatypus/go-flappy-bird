@@ -3,6 +3,7 @@ package files
 import (
 	"math/rand"
 	"time"
+	"math"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -26,8 +27,10 @@ type Game struct {
 	abilityTimer       *Timer
 	abilityActive      bool
 	ability            *Ability
-	saviours           [] *Saviour
+	saviours           []*Saviour
 	saviourTimer       *Timer
+	enemies            []*Enemy
+	enemySpawnTimer    *Timer
 
 	gameOver, startScreen bool
 	inTransition          bool
@@ -54,8 +57,11 @@ func NewGame() *Game {
 		abilityTimer:       NewTimer(10 * time.Second),
 		abilityActive:      false,
 
-		saviours:  [] *Saviour{},
+		saviours:     []*Saviour{},
 		saviourTimer: NewTimer(5 * time.Second),
+
+		enemies: []*Enemy{},
+		enemySpawnTimer: NewTimer(6 * time.Second),
 
 		gameOver:    false,
 		startScreen: true,
@@ -91,6 +97,66 @@ func (g *Game) updatePipes(active bool) {
 	}
 }
 
+func (g *Game) canSpawnEnemyAt(y float64) bool {
+	for _, e := range g.enemies {
+		if e.active && math.Abs(e.Y-y) < 100 {
+			return false
+		}
+	}
+	return true
+}
+
+
+func (g *Game) spawnEnemy() {
+	if rand.Float64() < 0.3 {
+		return
+	}
+
+	const maxAttempts = 5
+
+	for i := 0; i < maxAttempts; i++ {
+		posY := rand.Float64() * (float64(ScreenH) - 50)
+
+		if g.canSpawnEnemyAt(posY) {
+			g.enemies = append(
+				g.enemies,
+				NewEnemy(float64(ScreenW), posY),
+			)
+			return
+		}
+	}
+}
+
+
+func (g *Game) handleEnemy() {
+	if !g.enemySpawnTimer.IsActive() {
+		g.enemySpawnTimer.Start()
+	}
+
+	if g.enemySpawnTimer.IsReady() {
+		chance := rand.Float64() 
+		if chance <= 0.8 {
+			for i := 0 ; i < 6 ; i++ {
+				g.spawnEnemy() 
+			}
+		}
+		g.enemySpawnTimer.Reset()
+	}
+
+	var active []*Enemy
+    for _, e := range g.enemies {
+        e.Update()
+        if e.active {
+            active = append(active, e)
+        }
+    }
+    g.enemies = active
+
+	for _, e := range g.enemies {
+		e.Update()
+	}
+}
+
 func (g *Game) activateAbility() {
 	g.abilityActive = true
 	if !g.abilityActiveTimer.IsActive() {
@@ -118,8 +184,8 @@ func (g *Game) handleAbility() {
 }
 
 func (g *Game) spawnSaviours() {
-	x, y := 0.0, 50.0 
-	for i := 0 ; i < 5 ; i++ {
+	x, y := 0.0, 50.0
+	for i := 0; i < 5; i++ {
 		g.saviours = append(g.saviours, NewSaviour(x, y))
 		y += 100.0
 	}
@@ -131,7 +197,7 @@ func (g *Game) handleSaviours() {
 	}
 
 	if !g.startScreen && g.saviourTimer.IsReady() && ebiten.IsKeyPressed(ebiten.KeyR) {
-		g.spawnSaviours() 
+		g.spawnSaviours()
 		g.saviourTimer.Reset()
 	}
 
@@ -220,6 +286,7 @@ func (g *Game) updateEntities() {
 	g.player.Update(true)
 
 	g.updatePipes(true)
+	g.handleEnemy()
 	g.handleAbility()
 	g.handleSaviours()
 	g.spawnMagnet()
@@ -278,10 +345,27 @@ func (g *Game) handleMagnetPickup() {
 	}
 }
 
+func (g *Game) handleEnemyCollision() {
+	for _, e := range g.enemies {
+		for _, s := range g.saviours {
+			if s.active && e.active && s.GetRect().Intersects(e.GetRect()) {
+				e.active = false
+			}
+		}
+
+		if e.GetRect().Intersects(g.player.GetRect()) {
+			g.highScore = max(g.score, g.highScore)
+			g.gameOver = true
+			return
+		}
+	}
+}
+
 func (g *Game) handleCollisions() {
 	g.handlePipeCollision()
 	g.handleCoinCollision()
 	g.handleMagnetPickup()
+	g.handleEnemyCollision() 
 }
 
 func (g *Game) Update() error {
@@ -316,6 +400,12 @@ func (g *Game) resetScreen() {
 	g.abilityTimer.Stop()
 	g.abilityActiveTimer.Stop()
 	g.abilityActive = false
+
+	g.saviours = []*Saviour{} 
+	g.saviourTimer.Stop()
+
+	g.enemies = []*Enemy{} 
+	g.enemySpawnTimer.Stop()
 }
 
 func (g *Game) Draw(screen *ebiten.Image) {
@@ -351,6 +441,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	for _, s := range g.saviours {
 		if s.active {
 			s.Draw(screen)
+		}
+	}
+
+	for _, e := range g.enemies {
+		if e.active {
+			e.Draw(screen)
 		}
 	}
 

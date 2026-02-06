@@ -18,7 +18,7 @@ type Saviour struct {
 }
 
 const (
-	SaviourVelX = 2.0 
+	SaviourVelX = 3.0 
 )
 
 func NewSaviour(x, y float64) *Saviour {
@@ -71,7 +71,12 @@ func (s *Saviour) Update() error {
 func (s *Saviour) Draw(screen *ebiten.Image) {
 	opts := & ebiten.DrawImageOptions{}
 
-	opts.GeoM.Scale(-0.5, 0.5)
+	opts.GeoM.Scale(-0.35, 0.35)
 	opts.GeoM.Translate(s.X, s.Y)
 	screen.DrawImage(s.sprite, opts)
+}
+
+func (s *Saviour) GetRect() Rect {
+	w, h := s.sprite.Bounds().Dx(), s.sprite.Bounds().Dy()
+	return NewRect(s.X, s.Y, float64(w)*0.6, float64(h)*0.6)
 }

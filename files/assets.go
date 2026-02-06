@@ -21,6 +21,7 @@ var MagnetSprite  *ebiten.Image
 var CoinSprites [] *ebiten.Image
 var AbilitySprite *ebiten.Image
 var SaviourSprites [] *ebiten.Image
+var EnemySprites [] *ebiten.Image
 var ScoreFont font.Face
 
 func Init(fs embed.FS) {
@@ -41,6 +42,7 @@ func InitFeatures() {
 	MagnetSprite = loadAsset("assets/coin_magnet.png")
 	AbilitySprite = loadAsset("assets/ability-sprite.png")
 	SaviourSprites = loadAssets("assets/saviour-bird-*.png")
+	EnemySprites = loadAssets("assets/enemy-snake-*.png")
 }
 
 func loadAsset(path string) *ebiten.Image {
